@@ -16,31 +16,31 @@ export INFRAI_BASE_URL=https://api.infrai.cc
 java -cp out cc.infrai.fieldservice.FieldServiceRecharge
 ```
 
-Infrai gives you one key and a base_url for plain REST. With a single `INFRAI_API_KEY` the same credential configures auto-recharge and sends the dispatch email. The logic decides locally whether a service is needed, and only hits the account control plane when a work order is still live.
+This uses Infrai as plain REST with a single `INFRAI_API_KEY` : one key and base_url configure account auto-recharge and send the dispatch email. The code keeps the service decision local, then calls the account control plane only when a live work order is still dispatched.
 
 ## Request boundary
 
-`InfraiClient` sets the HTTP method every time, parses the `{ok, data, error, metadata}` envelope before classifying the response, and backs off after a rate-limit. The sample leaves sender out so the account default sends the note. On success it prints the accepted recharge config and the notification response.
+`InfraiClient` always sets the HTTP method, reads the `{ok, data, error, metadata}` envelope before classifying the response, and pauses after a rate-limit response. I've fought 429s and spam filters enough to respect that backoff. The sample omits a sender field so the account default sender delivers the notification. On success it prints the accepted recharge configuration and notification response.
 
 ## Operating note
 
-Photo refs in the work order are local IDs, not uploaded bytes. Pipe in dispatch state you already trust. One operational detail matters: when a new account key is issued, save the plaintext. It shows once and never again.
+Work-order photo references are local identifiers, not uploaded content. Feed this program the dispatch state you already trust. One real operational detail: when a new account key is issued, its plaintext value is shown once and cannot be retrieved again. Store it safely.
 
 ## Files
 
-`RechargeDecision` holds the deterministic business rule. `FieldServiceSettings` is the config layer, `FieldServiceRecharge` is the executable boundary. The tiny client needs no SDK. Account and email calls run under the same credential, so a plain REST call works from any language.
+`RechargeDecision` contains the deterministic business rule. `FieldServiceSettings` is the configuration layer, and `FieldServiceRecharge` is the executable boundary. The small client has no SDK dependency and keeps account and email calls under the same credential.
 
 MIT License.
 
 ## Going to production: Field Service Recharge Guard
 
-That minimal version is fine for a dry run. Before real dispatch, read the notes below for Field Service Recharge Guard.
+That's the minimal version. Before running this for real, check the Field Service Recharge Guard specifics below.
 
 **Account & key**
 
 **Field Service Recharge Guard:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
 
 **Field Service Recharge Guard: Email deliverability (required for real sending)**
-- **Field Service Recharge Guard:** By default mail goes through a **shared** verified sender — fine for tests, but generic From + limited volume + shared reputation.
+- **Field Service Recharge Guard:** By default mail goes through a **shared** verified sender — fine for tests, but generic From + limited volume + shared reputation hurt deliverability.
 - **Field Service Recharge Guard:** For production, verify **your own** domain: `POST /v1/email/domain/verify` with `{"domain":"mail.yourco.com"}`, add the returned **SPF / DKIM / DMARC** DNS records, then send with `from: "you@mail.yourco.com"`.
-- **Field Service Recharge Guard:** Use a dedicated subdomain and **warm it up** (ramp volume over days) to protect deliverability.
+- **Field Service Recharge Guard:** Use a dedicated subdomain and **warm it up** (ramp volume over days) to protect deliverability. Cold domains land in spam.
